@@ -12,10 +12,11 @@ def test_sanitize():
     # executable plugin blocks are defused, harmless ones kept
     assert s("```dataviewjs\ndv.x()\n```") == "```text\ndv.x()\n```"
     assert s("~~~dataview\nLIST\n~~~") == "~~~text\nLIST\n~~~"
-    assert s("```yaml\na: <b>\n```") == "```yaml\na: <b>\n```"          # code content untouched
-    # Dataview inline queries
+    assert s("```yaml\na: 1 < 2\n```") == "```yaml\na: 1 < 2\n```"      # harmless code untouched
+    # Dataview inline queries, including split across lines
     assert s("x `$= dv.y` z") == f"x `{Z}$= dv.y` z"
     assert s("`= this.file`") == f"`{Z}= this.file`"
+    assert s("`\n$= dv.y`") == f"`\n{Z}$= dv.y`"
     assert s("run `docker ps`") == "run `docker ps`"
     # Templater, everywhere including code
     assert s("<% tp.x %>") == f"<{Z}% tp.x %>"
@@ -25,19 +26,18 @@ def test_sanitize():
     assert s("![a [b]](https://x)") == "[a [b]](https://x)"
     assert s("![a][r]\n[r]: https://x") == "[a][r]\n[r]: https://x"
     assert s("![[Local note]]") == "![[Local note]]"
-    assert s('<img src="https://evil">') == '&lt;img src="https://evil">'
-    assert s("<iframe src=x></iframe>") == "&lt;iframe src=x>&lt;/iframe>"
+    L = "‹"
+    assert s('<img src="https://evil">') == f'{L}img src="https://evil">'
+    assert s("<iframe src=x></iframe>") == f"{L}iframe src=x>{L}/iframe>"
     assert s("a<br>b | 1 < 2") == "a<br>b | 1 < 2"
-    assert s("inline `<b>` ok") == "inline `<b>` ok"
     # fences inside quotes / lists / callouts are defused too
     assert s("> ```dataviewjs\n> dv.x()\n> ```") == "> ```text\n> dv.x()\n> ```"
     assert s("- ~~~ dataview\n  LIST") == "- ~~~text\n  LIST"
-    # parser mismatches err toward cleaning: 4-space "fence" and mismatched backtick runs aren't code
-    assert s("    ```\n<img src=x>") == "    ```\n&lt;img src=x>"
-    assert s("``` a`b\n<img src=x>").endswith("\n&lt;img src=x>")
-    assert s("`a`` <img src=x> ``") == "`a`` <img src=x> ``"     # CommonMark: `` … `` pair is a code span
-    assert s("`a`` <img src=x>") == "`a`` &lt;img src=x>"       # no equal-length closer: prose
-    assert s("``a` b``") == "``a` b``"                         # equal-length runs still code
+    # no code/prose detection to fool: HTML is defused everywhere, whatever the backticks or fences do
+    for tricky in ["inline `<img src=x>`", "\\`<img src=x>`", "- ```\n  x\n<img src=x>\n```",
+                   "    ```\n<img src=x>", "`a`` <img src=x> ``"]:
+        out = s(tricky)
+        assert "<img" not in out and f"{L}img" in out, (tricky, out)
 
 
 def test_plain_text_only():

@@ -437,47 +437,21 @@ SAFE_FENCE_LANGS = {"text", "plaintext", "bash", "sh", "shell", "console", "powe
                     "json", "toml", "ini", "conf", "env", "dockerfile", "python", "py", "javascript",
                     "js", "typescript", "ts", "go", "rust", "sql", "nginx", "caddyfile", "hcl", "xml",
                     "html", "css", "diff"}
-# Top-level fence per CommonMark: <=3 spaces indent; a backtick fence's info string has no backtick.
-FENCE_RE = re.compile(r"^( {0,3})(`{3,}(?=[^`]*$)|~{3,})(.*)$")
-# Any fence opener anywhere (inside > quotes, lists, callouts): its language gets checked too.
+# Any fence opener anywhere (top level, > quotes, lists, callouts): its language gets checked.
 ANY_FENCE_RE = re.compile(r"(`{3,}|~{3,})[ \t]*([^\s`~]+)")
-# Code span: a backtick run closes only on a run of exactly the same length.
-INLINE_CODE_RE = re.compile(r"(?<!`)(`+)(?!`)(.+?)(?<!`)\1(?!`)")
 ZWSP = "​"
 
 
-def _clean_prose(s):
-    s = re.sub(r"!\[(?!\[)", "[", s)        # every image embed form -> plain link (no auto-load); keeps ![[wiki]]
-    return re.sub(r"<(?!br\s*/?>)(?=[A-Za-z/!?])", "&lt;", s)   # raw HTML -> text; keep <br> for tables
-
-
 def sanitize_markdown(text):
-    # Executable bits are defused on every line, in or out of code, so a parser mismatch can't skip them.
+    """Every rule applies to the whole text, code included. No attempt to tell code from prose:
+    that is exactly where a parser mismatch with Obsidian would let something through.
+    ponytail: the price is cosmetic: inside code, `<tag` shows as `‹tag` and `![x](y)` as `[x](y)`."""
     text = ANY_FENCE_RE.sub(lambda m: m.group(0) if m.group(2).lower() in SAFE_FENCE_LANGS
                             else m.group(1) + "text", text)
-    text = re.sub(r"(`+[ \t]*)(\$?=)", "\\1" + ZWSP + "\\2", text)   # Dataview inline query / inline JS
-    text = text.replace("<%", "<" + ZWSP + "%")                       # Templater tags
-    # HTML / image cleanup skips code only where we're sure it's code. Any mismatch errs toward
-    # cleaning text that is really code (cosmetic), never toward leaving live HTML.
-    out, fence = [], None
-    for line in text.split("\n"):
-        m = FENCE_RE.match(line)
-        if fence:
-            if m and m.group(2)[0] == fence[0] and len(m.group(2)) >= len(fence) and not m.group(3).strip():
-                fence = None
-            out.append(line)
-            continue
-        if m:
-            fence = m.group(2)
-            out.append(line)
-            continue
-        parts, pos = [], 0
-        for cm in INLINE_CODE_RE.finditer(line):
-            parts += [_clean_prose(line[pos:cm.start()]), cm.group(0)]
-            pos = cm.end()
-        parts.append(_clean_prose(line[pos:]))
-        out.append("".join(parts))
-    return "\n".join(out)
+    text = re.sub(r"(`+\s*)(\$?=)", "\\1" + ZWSP + "\\2", text)   # Dataview inline query / JS, even across lines
+    text = text.replace("<%", "<" + ZWSP + "%")                   # Templater tags
+    text = re.sub(r"!\[(?!\[)", "[", text)        # every image embed form -> plain link (no auto-load); keeps ![[wiki]]
+    return re.sub(r"<(?!br\s*/?>)(?=[A-Za-z/!?])", "‹", text)   # no HTML tags (lookalike ‹); <br> kept for tables
 
 
 def plain_text_only(s):
