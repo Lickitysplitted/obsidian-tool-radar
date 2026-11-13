@@ -1,0 +1,44 @@
+# Obsidian tool radar: Docker option
+#
+#   cp .env.example .env                              # paths and user IDs
+#   cp vault-research.env.example vault-research.env  # Claude auth (secret)
+#   docker compose up -d --build                      # watcher only (vault synced some other way)
+#   docker compose --profile livesync up -d --build   # watcher + headless LiveSync CLI
+#
+# See docs/docker.md.
+
+services:
+  watcher:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        CLAUDE_CODE_VERSION: ${CLAUDE_CODE_VERSION:-latest}
+    image: obsidian-tool-radar:local
+    restart: unless-stopped
+    env_file:
+      - path: vault-research.env
+        required: true
+    environment:
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+    volumes:
+      - ${VAULT_DIR:?set VAULT_DIR in .env}:/vault
+      - watcher-data:/data
+
+  # Optional: keep the vault in sync with a Self-hosted LiveSync CouchDB, no Obsidian needed.
+  # Upstream publishes amd64 images only; on ARM64 add -f compose.livesync-build.yaml.
+  livesync:
+    profiles: ["livesync"]
+    image: ghcr.io/vrtmrz/livesync-cli:${LIVESYNC_TAG:-latest}
+    restart: unless-stopped
+    user: "${PUID:-1000}:${PGID:-1000}"
+    environment:
+      HOME: /data
+    command: ["--vault", "/vault", "daemon"]
+    volumes:
+      - ${LIVESYNC_DB_DIR:-./livesync-db}:/data
+      - ${VAULT_DIR:?set VAULT_DIR in .env}:/vault
+
+volumes:
+  watcher-data:

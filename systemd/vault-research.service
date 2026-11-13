@@ -1,0 +1,22 @@
+[Unit]
+Description=Obsidian research queue watcher (Claude Code headless)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# --- edit these ---
+Environment=VAULT_PATH=%h/vault
+Environment="INBOX_NOTE=Research Queue.md"
+Environment=RESEARCH_DIR=Research
+Environment="LAB_PROFILE_NOTE=Lab Profile.md"
+Environment=DEEPSCOPE_DIR=%h/.claude/skills/deepscope
+EnvironmentFile=-%h/.config/vault-research.env
+# claude's native installer puts the binary in ~/.local/bin
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/python3 %h/bin/vault_research_watcher.py
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=default.target

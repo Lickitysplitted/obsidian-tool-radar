@@ -1,0 +1,14 @@
+# Keep secrets and personal data out of the build context
+*.env
+.env*
+livesync-db/
+.livesync/
+state/
+work/
+vault/
+Research/
+Lab Profile.md
+Research Queue.md
+.git/
+__pycache__/
+*.zip

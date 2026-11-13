@@ -1,0 +1,9 @@
+# Build the LiveSync CLI from source instead of pulling the amd64-only upstream image (for ARM64 hosts).
+#   docker compose -f compose.yaml -f compose.livesync-build.yaml --profile livesync up -d --build
+# Set LIVESYNC_REF in .env to the release tag matching your Obsidian plugin version.
+services:
+  livesync:
+    image: livesync-cli:local
+    build:
+      context: https://github.com/vrtmrz/obsidian-livesync.git#${LIVESYNC_REF:-main}
+      dockerfile: src/apps/cli/Dockerfile

@@ -1,0 +1,28 @@
+# --- Secrets: Claude auth (OAuth token or API key) ---
+# Template: vault-research.env.example
+*.env
+!*.env.example
+
+# --- LiveSync CLI: local DB + settings (CouchDB URL, user, password, E2EE passphrase) ---
+# Docs: docs/livesync-cli-settings.md
+livesync-db/
+.livesync/
+**/settings.json
+
+# --- Watcher runtime state (your research history and dedupe index) ---
+state/
+state.json
+work/
+
+# --- Personal vault content ---
+# Template: templates/Lab Profile.example.md
+Lab Profile.md
+Research Queue.md
+Research/
+vault/
+
+# --- Temp / Python ---
+.*.tmp
+*.tmp
+__pycache__/
+*.pyc
