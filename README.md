@@ -5,9 +5,11 @@ Obsidian (any device) ──sync──▶ server: ~/vault/Research Queue.md
                                          │  new line = a tool's name and/or link
                                          │  watcher polls every 10s, waits 20s of quiet
                                          ▼
-          claude -p  (WebSearch + WebFetch only)
-            + deepscope skill (passive-only)       ← ~/.claude/skills/deepscope (bundled)
-            + your Lab Profile note                ← ~/vault/Lab Profile.md
+          1. claude -p  (WebSearch + WebFetch only)
+               + deepscope skill (passive-only)    ← ~/.claude/skills/deepscope (bundled)
+          2. claude -p  (no tools) → Fit section
+               + your Lab Profile note             ← ~/vault/Lab Profile.md
+                                         │  output sanitized before it's written
                                          │
                                          ▼
           ~/vault/Research/<Canonical Name>.md  ──sync──▶ back to Obsidian
@@ -27,7 +29,7 @@ A link always wins: it tells Claude exactly which project you mean, and any text
 
 Line states: plain = queued · ⏳ = researching · ✅ = done (linked) · ⚠️ = failed 3× (delete the ⚠️ to retry)
 
-**Duplicates aren't researched twice.** A name, the repo link, the website link, or a deeper GitHub URL (`/tree/main/...`) for a tool you already have all link to the existing note. To force fresh research, delete the note.
+**Duplicates aren't researched twice.** A name, the repo link, the website link, or a deeper GitHub URL (`/tree/main/...`) for a tool you already have all link to the existing note. To force fresh research, delete the note. Research never overwrites an existing note: if a new link turns out to be a tool you already have, you get a second note (`Name (2).md`).
 
 ## What each note contains
 
@@ -45,7 +47,7 @@ Line states: plain = queued · ⏳ = researching · ✅ = done (linked) · ⚠�
 9. Alternatives & competitors (comparison table, with open-source options called out)
 10. Potential tech debt (lock-in, relicensing risk, bus factor, upgrade pain, exit cost)
 11. Security & trust (deepscope: **Trust:** Deploy / Deploy with hardening / Isolate / Avoid, plus risk table, findings, mitigations and verification checklist)
-12. Fit for my lab (**Fit:** Adopt / Trial / Watch / Skip, judged against `Lab Profile.md`)
+12. Fit for my lab (**Fit:** Adopt / Trial / Watch / Skip, judged against `Lab Profile.md` in a separate run with no tools)
 13. Open questions
 14. Sources
 
@@ -126,5 +128,8 @@ To preview the exact prompt for an input: `python3 vault_research_watcher.py --p
 - This is a deep research run, so expect several minutes and dozens of web fetches per item. Items run one at a time, and anything added mid-run is picked up next.
 - Deepscope runs **passive-only** here. Nothing is cloned, installed or probed. For an active scope of something you already host, run deepscope interactively.
 - Claude gets only WebSearch and WebFetch: no shell, no file access, no MCP servers. The script writes all files itself.
+- Your Lab Profile never goes to the run that browses the web, only to a second run with no tools. A malicious page therefore can't trick Claude into fetching a URL that carries your lab details.
+- Before anything is written to the vault, model output is defused: `dataview`/`dataviewjs` and other plugin code blocks become plain `text`, Dataview inline queries and Templater `<% %>` tags are broken up, raw HTML is shown as text, and image embeds (other than `![[note]]`) become plain links. The Fit section, the only part written by the run that saw your Lab Profile, has every URL removed. Links elsewhere in a note come from the web research run, which never saw your lab details.
+- Self-check: `python3 test_vault_research_watcher.py`
 - Your original line text is kept in the note's `added_as` field. The inbox line keeps your link.
 - State (dedupe aliases, retries) lives in `~/.local/state/vault-research/state.json`.

@@ -1,6 +1,6 @@
 # Lab Profile
 
-Used by the research watcher for the "Fit for my lab" verdict. Copy this file to your vault root as `Lab Profile.md` and replace the placeholders. Keep it short and general: everything here goes into every research prompt.
+Used by the research watcher for the "Fit for my lab" verdict. Copy this file to your vault root as `Lab Profile.md` and replace the placeholders. Keep it short and general. It's only sent to the second, tool-less Claude run that writes the fit verdict, never to the run that browses the web, but it still leaves your machine with every item.
 
 - **Platforms:** <e.g. hypervisor (VMs/containers), Docker hosts, Kubernetes, Windows / macOS / Linux desktops, GPU box>
 - **CPU architectures:** <e.g. x86_64, ARM64>
