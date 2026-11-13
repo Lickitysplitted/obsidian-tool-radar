@@ -437,8 +437,12 @@ SAFE_FENCE_LANGS = {"text", "plaintext", "bash", "sh", "shell", "console", "powe
                     "json", "toml", "ini", "conf", "env", "dockerfile", "python", "py", "javascript",
                     "js", "typescript", "ts", "go", "rust", "sql", "nginx", "caddyfile", "hcl", "xml",
                     "html", "css", "diff"}
-FENCE_RE = re.compile(r"^(\s*)(`{3,}|~{3,})(.*)$")
-INLINE_CODE_RE = re.compile(r"(`+)(.+?)\1")
+# Top-level fence per CommonMark: <=3 spaces indent; a backtick fence's info string has no backtick.
+FENCE_RE = re.compile(r"^( {0,3})(`{3,}(?=[^`]*$)|~{3,})(.*)$")
+# Any fence opener anywhere (inside > quotes, lists, callouts): its language gets checked too.
+ANY_FENCE_RE = re.compile(r"(`{3,}|~{3,})[ \t]*([^\s`~]+)")
+# Code span: a backtick run closes only on a run of exactly the same length.
+INLINE_CODE_RE = re.compile(r"(?<!`)(`+)(?!`)(.+?)(?<!`)\1(?!`)")
 ZWSP = "​"
 
 
@@ -448,6 +452,13 @@ def _clean_prose(s):
 
 
 def sanitize_markdown(text):
+    # Executable bits are defused on every line, in or out of code, so a parser mismatch can't skip them.
+    text = ANY_FENCE_RE.sub(lambda m: m.group(0) if m.group(2).lower() in SAFE_FENCE_LANGS
+                            else m.group(1) + "text", text)
+    text = re.sub(r"(`+[ \t]*)(\$?=)", "\\1" + ZWSP + "\\2", text)   # Dataview inline query / inline JS
+    text = text.replace("<%", "<" + ZWSP + "%")                       # Templater tags
+    # HTML / image cleanup skips code only where we're sure it's code. Any mismatch errs toward
+    # cleaning text that is really code (cosmetic), never toward leaving live HTML.
     out, fence = [], None
     for line in text.split("\n"):
         m = FENCE_RE.match(line)
@@ -458,19 +469,23 @@ def sanitize_markdown(text):
             continue
         if m:
             fence = m.group(2)
-            lang = (m.group(3).split() or [""])[0].lower()
-            out.append(line if not lang or lang in SAFE_FENCE_LANGS else f"{m.group(1)}{fence}text")
+            out.append(line)
             continue
         parts, pos = [], 0
         for cm in INLINE_CODE_RE.finditer(line):
-            code = cm.group(2)
-            if code.lstrip().startswith(("=", "$=")):      # Dataview inline query / inline JS
-                code = ZWSP + code
-            parts += [_clean_prose(line[pos:cm.start()]), cm.group(1) + code + cm.group(1)]
+            parts += [_clean_prose(line[pos:cm.start()]), cm.group(0)]
             pos = cm.end()
         parts.append(_clean_prose(line[pos:]))
         out.append("".join(parts))
-    return "\n".join(out).replace("<%", "<" + ZWSP + "%")   # Templater tags, anywhere
+    return "\n".join(out)
+
+
+def plain_text_only(s):
+    """For text written by the run that saw the lab profile: no way to form a link of any kind."""
+    s = s.replace("&", "&amp;").replace("<", "&lt;")           # no entities, HTML or autolinks
+    s = re.sub(r"[\[\]]", lambda m: "\\" + m.group(0), s)      # no [links], ![images], [[wikilinks]], [ref]: defs
+    return re.sub(r"(?i)\b[a-z][a-z0-9+.-]*://\S*|\bwww\.\S+|\b(?:mailto|data|javascript|file|obsidian):\S+",
+                  "(link removed)", s)                          # no bare autolinked URLs
 
 
 def yaml_value(v):
@@ -502,8 +517,8 @@ def write_note(path, item, meta, body):
         "has_api": meta.get("has_api"),
         "latest_release": meta.get("latest_release"),
         "last_activity": meta.get("last_activity"),
-        "fit": meta.get("fit_verdict"),
-        "trust": meta.get("trust_verdict"),
+        "fit": meta.get("fit_verdict") if meta.get("fit_verdict") in FIT_VERDICTS else None,
+        "trust": meta.get("trust_verdict") if meta.get("trust_verdict") in TRUST_VERDICTS else None,
         "alternatives": meta.get("alternatives") or [],
         "added_as": item["text"],
         "researched": now,
@@ -536,15 +551,15 @@ def add_fit_section(meta, name, body):
     ok, result = run_claude(build_fit_prompt(name, body), web=False)
     if ok:
         fit_meta, fit = split_meta(result)
-        meta["fit_verdict"] = fit_meta.get("fit_verdict")
-        # This run saw the lab profile, so no URL from it may reach the vault (click-to-exfiltrate).
-        fit = re.sub(r"(?i)\b(?:https?|ftp)://\S+|\bwww\.\S+", "(link removed)", fit)
-        if not fit.startswith("## Fit for my lab"):
-            fit = "## Fit for my lab\n" + fit
+        v = fit_meta.get("fit_verdict")
+        meta["fit_verdict"] = v if v in FIT_VERDICTS else None
+        # This run saw the lab profile, so nothing link-shaped from it may reach the vault.
+        fit = plain_text_only(re.sub(r"\A\s*## Fit for my lab\s*", "", fit))
+        fit = "## Fit for my lab\n" + fit
     else:
         log(f"  fit pass failed: {result}")
         meta["fit_verdict"] = None
-        fit = f"## Fit for my lab\n**Fit:** not assessed (the fit step failed: {result[:200]})"
+        fit = f"## Fit for my lab\n**Fit:** not assessed (the fit step failed: {plain_text_only(result[:200])})"
     i = body.find("## Open questions")
     return f"{body[:i]}{fit}\n\n{body[i:]}" if i >= 0 else f"{body}\n\n{fit}"
 
