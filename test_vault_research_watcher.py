@@ -43,9 +43,10 @@ def test_sanitize():
 def test_plain_text_only():
     p = w.plain_text_only
     for evil in ["[x](//evil.com/?d=1)", "![i](https://e)", "&#104;ttps://e", "<https://e>",
-                 "[r]: //e", "[[Secret note]]", "HTTPS://E.COM", "www.e.com", "mailto:a@e"]:
+                 "[r]: //e", "[[Secret note]]", "HTTPS://E.COM", "www.e.com", "mailto:a@e",
+                 r"\[x\](//e)", r"\\[x\\](//e)", r"![x\](//e)"]:
         out = w.sanitize_markdown(p(evil))
-        assert not re.search(r"(?<!\\)[\[\]]", out), (evil, out)          # every bracket escaped
+        assert not re.search(r"[\[\]\\]", out), (evil, out)               # no brackets or backslashes left
         assert "&#" not in out and "<h" not in out.lower(), (evil, out)
         assert "://e" not in out.lower() and "www.e" not in out and "mailto:" not in out, (evil, out)
     assert p("**Fit:** Trial - runs on ARM64") == "**Fit:** Trial - runs on ARM64"
@@ -69,7 +70,7 @@ def test_fit_pass_isolated():
     assert meta["fit_verdict"] == "Trial"
     assert body.index("## Fit for my lab") < body.index("## Open questions")
     fit = body[body.index("## Fit for my lab"):body.index("## Open questions")]
-    assert not re.search(r"(?<!\\)[\[\]]", fit) and "www.evil" not in fit   # nothing link-shaped
+    assert not re.search(r"[\[\]\\]", fit) and "www.evil" not in fit   # nothing link-shaped
     assert "SECRET-LAB" in calls[0][0] and calls[0][1] is False
     assert "SECRET-LAB" not in research_prompt           # web run never sees the lab profile
 

@@ -482,8 +482,9 @@ def sanitize_markdown(text):
 
 def plain_text_only(s):
     """For text written by the run that saw the lab profile: no way to form a link of any kind."""
+    # Brackets are replaced, not escaped: escaping is defeated by input that carries its own backslashes.
+    s = s.replace("\\", "").replace("[", "(").replace("]", ")")   # no [links], ![images], [[wikilinks]], [ref]: defs
     s = s.replace("&", "&amp;").replace("<", "&lt;")           # no entities, HTML or autolinks
-    s = re.sub(r"[\[\]]", lambda m: "\\" + m.group(0), s)      # no [links], ![images], [[wikilinks]], [ref]: defs
     return re.sub(r"(?i)\b[a-z][a-z0-9+.-]*://\S*|\bwww\.\S+|\b(?:mailto|data|javascript|file|obsidian):\S+",
                   "(link removed)", s)                          # no bare autolinked URLs
 
