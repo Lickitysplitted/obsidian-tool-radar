@@ -375,7 +375,8 @@ def fallback_name(item):
 
 def link_for(path, label):
     target = path.relative_to(VAULT).with_suffix("").as_posix()
-    alias = (label or path.stem).replace("|", "-").replace("]", "")
+    # label can come from the model: one line only (a newline would queue new inbox items), no link syntax.
+    alias = " ".join(re.sub(r"[\[\]|]", " ", label or path.stem).split())[:80] or path.stem
     return f"[[{target}|{alias}]]"
 
 

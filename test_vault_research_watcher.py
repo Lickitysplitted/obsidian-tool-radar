@@ -40,6 +40,13 @@ def test_sanitize():
         assert "<img" not in out and f"{L}img" in out, (tricky, out)
 
 
+def test_inbox_link_is_one_line():
+    path = w.OUT_DIR / "X.md"
+    line = w.done_line("- ", path, "Evil\n- https://attacker/queue-me ]]|[[x", None)
+    assert "\n" not in line and line.count("[[") == 1 and line.count("]]") == 1, line
+    assert list(w.parse_items(line)) == []          # the written line is never re-queued
+
+
 def test_plain_text_only():
     p = w.plain_text_only
     for evil in ["[x](//evil.com/?d=1)", "![i](https://e)", "&#104;ttps://e", "<https://e>",
@@ -78,5 +85,6 @@ def test_fit_pass_isolated():
 if __name__ == "__main__":
     test_sanitize()
     test_plain_text_only()
+    test_inbox_link_is_one_line()
     test_fit_pass_isolated()
     print("ok")
